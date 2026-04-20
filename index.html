@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulator Interactiv RLC - Curent Alternativ</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --panel-bg: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+        h1, h2, h3 { margin-top: 0; }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border);
+        }
+        .control-group {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        .control-group:last-child { border-bottom: none; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 14px;}
+        input[type="range"] { width: 100%; cursor: pointer; }
+        .val-display { float: right; font-weight: normal; color: var(--primary); }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: bold;}
+        input[type="checkbox"], input[type="radio"] { cursor: pointer; transform: scale(1.2); }
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            background: #eff6ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .result-item { font-size: 14px; }
+        .result-value { font-weight: bold; color: var(--primary); font-size: 16px; }
+        .alert { background: #dcfce7; color: #166534; padding: 10px; border-radius: 6px; margin-top: 10px; text-align: center; font-weight: bold; display: none; }
+        canvas {
+            width: 100%;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .canvas-container { text-align: center; }
+        @media (max-width: 900px) {
+            .container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="panel">
+            <h2>⚙️ Panou de Control</h2>
+            
+            <div class="control-group">
+                <h3>Tip Circuit</h3>
+                <label><input type="radio" name="mode" value="serie" checked onchange="updateSim()"> Circuit RLC Serie</label>
+                <label><input type="radio" name="mode" value="paralel" onchange="updateSim()"> Circuit RLC Paralel</label>
+            </div>
+
+            <div class="control-group">
+                <h3>Sursă de curent (~)</h3>
+                <label>Frecvență (f): <span class="val-display" id="f-val">50 Hz</span></label>
+                <input type="range" id="f" min="10" max="500" value="50" oninput="updateSim()">
+                
+                <label>Tensiune (U): <span class="val-display" id="u-val">220 V</span></label>
+                <input type="range" id="u" min="10" max="300" value="220" oninput="updateSim()">
+            </div>
+
+            <div class="control-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="en-r" checked onchange="updateSim()">
+                    <label for="en-r" style="margin:0;">Rezistor (R)</label>
+                </div>
+                <label>Rezistență: <span class="val-display" id="r-val">100 Ω</span></label>
+                <input type="range" id="r" min="1" max="500" value="100" oninput="updateSim()">
+            </div>
+
+            <div class="control-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="en-l" checked onchange="updateSim()">
+                    <label for="en-l" style="margin:0;">Bobină (L)</label>
+                </div>
+                <label>Inductanță: <span class="val-display" id="l-val">300 mH</span></label>
+                <input type="range" id="l" min="10" max="1000" value="300" oninput="updateSim()">
+            </div>
+
+            <div class="control-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="en-c" checked onchange="updateSim()">
+                    <label for="en-c" style="margin:0;">Condensator (C)</label>
+                </div>
+                <label>Capacitate: <span class="val-display" id="c-val">30 μF</span></label>
+                <input type="range" id="c" min="1" max="200" value="30" oninput="updateSim()">
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>📊 Rezultate și Vizualizare</h2>
+            
+            <div class="results-grid">
+                <div class="result-item">X<sub>L</sub> (Reactanță Ind.): <br><span class="result-value" id="res-xl">0 Ω</span></div>
+                <div class="result-item">X<sub>C</sub> (Reactanță Cap.): <br><span class="result-value" id="res-xc">0 Ω</span></div>
+                <div class="result-item">Z (Impedanță): <br><span class="result-value" id="res-z">0 Ω</span></div>
+                <div class="result-item">I (Curent efectiv): <br><span class="result-value" id="res-i">0 A</span></div>
+                <div class="result-item">Defazaj (φ): <br><span class="result-value" id="res-phi">0°</span></div>
+                <div class="result-item">Factor putere (cos φ): <br><span class="result-value" id="res-cos">1</span></div>
+            </div>
+            
+            <div id="resonance-alert" class="alert">⚡ Circuitul este la Rezonanță! (X<sub>L</sub> ≈ X<sub>C</sub>)</div>
+
+            <div class="canvas-container" style="margin-top: 20px;">
+                <h3>Schema Circuitului</h3>
+                <canvas id="circuitCanvas" width="800" height="250"></canvas>
+            </div>
+
+            <div class="canvas-container">
+                <h3>Diagrama Fazorială</h3>
+                <canvas id="phasorCanvas" width="800" height="350"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateSim() {
+            // Preluare valori
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            const f = parseFloat(document.getElementById('f').value);
+            const U = parseFloat(document.getElementById('u').value);
+            const R_val = parseFloat(document.getElementById('r').value);
+            const L_val = parseFloat(document.getElementById('l').value) / 1000; // mH in H
+            const C_val = parseFloat(document.getElementById('c').value) / 1000000; // uF in F
+            
+            const enR = document.getElementById('en-r').checked;
+            const enL = document.getElementById('en-l').checked;
+            const enC = document.getElementById('en-c').checked;
+
+            // Actualizare texte UI
+            document.getElementById('f-val').innerText = f + ' Hz';
+            document.getElementById('u-val').innerText = U + ' V';
+            document.getElementById('r-val').innerText = R_val + ' Ω';
+            document.getElementById('l-val').innerText = (L_val * 1000) + ' mH';
+            document.getElementById('c-val').innerText = (C_val * 1000000) + ' μF';
+
+            // Calcule fizica clasa 11
+            const w = 2 * Math.PI * f;
+            const XL = enL ? w * L_val : 0;
+            const XC = enC ? 1 / (w * C_val) : 0;
+            const R = enR ? R_val : 0.001; // evitam impartirea la 0
+
+            let Z, I, phiRadiani;
+
+            if (mode === 'serie') {
+                Z = Math.sqrt(Math.pow(R, 2) + Math.pow(XL - XC, 2));
+                I = U / Z;
+                phiRadiani = Math.atan2((XL - XC), R);
+            } else {
+                // Mod Paralel
+                const G = enR ? 1/R : 0;
+                const BL = enL ? 1/XL : 0;
+                const BC = enC ? 1/XC : 0;
+                const B = BC - BL; // Susceptanta totala
+                const Y = Math.sqrt(Math.pow(G, 2) + Math.pow(B, 2)); // Admitanta
+                Z = Y > 0 ? 1 / Y : Infinity;
+                I = U * Y;
+                phiRadiani = Math.atan2(-B, G); // Defazaj tensiune fata de curent
+            }
+
+            const phiGrade = phiRadiani * (180 / Math.PI);
+            const cosPhi = Math.cos(phiRadiani);
+
+            // Afisare rezultate
+            document.getElementById('res-xl').innerText = XL.toFixed(1) + ' Ω';
+            document.getElementById('res-xc').innerText = XC.toFixed(1) + ' Ω';
+            document.getElementById('res-z').innerText = Z.toFixed(1) + ' Ω';
+            document.getElementById('res-i').innerText = I.toFixed(3) + ' A';
+            document.getElementById('res-phi').innerText = phiGrade.toFixed(1) + '°';
+            document.getElementById('res-cos').innerText = cosPhi.toFixed(3);
+
+            // Alerta Rezonanta
+            const alertBox = document.getElementById('resonance-alert');
+            if (enL && enC && Math.abs(XL - XC) < (0.1 * Math.max(XL, XC))) {
+                alertBox.style.display = 'block';
+            } else {
+                alertBox.style.display = 'none';
+            }
+
+            drawCircuit(mode, enR, enL, enC);
+            drawPhasors(mode, U, I, R, XL, XC, phiRadiani);
+        }
+
+        // Desenare Schema Circuitului
+        function drawCircuit(mode, r, l, c) {
+            const canvas = document.getElementById('circuitCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2;
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "#1e293b";
+
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+
+            // Deseneaza Sursa (stanga)
+            ctx.beginPath();
+            ctx.arc(100, cy, 20, 0, 2 * Math.PI);
+            ctx.stroke();
+            ctx.fillText("~", 95, cy + 5);
+            ctx.fillText("U, f", 85, cy - 25);
+
+            if (mode === 'serie') {
+                let startX = 120;
+                let components = [];
+                if(r) components.push('R');
+                if(l) components.push('L');
+                if(c) components.push('C');
+
+                if(components.length === 0) return;
+
+                const spacing = 500 / components.length;
+                
+                ctx.beginPath();
+                ctx.moveTo(100, cy - 20); // sus sursa
+                ctx.lineTo(100, 50);
+                ctx.lineTo(200, 50); // cablu sus
+                ctx.stroke();
+
+                components.forEach((comp, index) => {
+                    let x = 200 + index * spacing;
+                    let nextX = 200 + (index + 1) * spacing;
+                    
+                    if (comp === 'R') drawResistor(ctx, x, 50);
+                    if (comp === 'L') drawCoil(ctx, x, 50);
+                    if (comp === 'C') drawCapacitor(ctx, x, 50);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(x + 50, 50);
+                    ctx.lineTo(nextX, 50);
+                    ctx.stroke();
+                });
+
+                // Inchidere circuit
+                ctx.beginPath();
+                ctx.lineTo(700, 50);
+                ctx.lineTo(700, cy + 80);
+                ctx.lineTo(100, cy + 80);
+                ctx.lineTo(100, cy + 20); // jos sursa
+                ctx.stroke();
+
+            } else {
+                // Paralel
+                ctx.beginPath();
+                ctx.moveTo(100, cy - 20);
+                ctx.lineTo(100, 40);
+                ctx.lineTo(600, 40); // cablu sus
+                
+                ctx.moveTo(100, cy + 20);
+                ctx.lineTo(100, 210);
+                ctx.lineTo(600, 210); // cablu jos
+                ctx.stroke();
+
+                let components = [];
+                if(r) components.push('R');
+                if(l) components.push('L');
+                if(c) components.push('C');
+                
+                const spacing = 400 / (components.length + 1);
+
+                components.forEach((comp, index) => {
+                    let x = 100 + (index + 1) * spacing;
+                    ctx.beginPath();
+                    ctx.moveTo(x + 25, 40);
+                    ctx.lineTo(x + 25, 90);
+                    ctx.stroke();
+
+                    if (comp === 'R') drawResistorVertical(ctx, x + 25, 90);
+                    if (comp === 'L') drawCoilVertical(ctx, x + 25, 90);
+                    if (comp === 'C') drawCapacitorVertical(ctx, x + 25, 90);
+
+                    ctx.beginPath();
+                    ctx.moveTo(x + 25, 140);
+                    ctx.lineTo(x + 25, 210);
+                    ctx.stroke();
+                });
+            }
+        }
+
+        // Simboluri componente
+        function drawResistor(ctx, x, y) {
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            for(let i=0; i<4; i++) {
+                ctx.lineTo(x + 5 + i*10, y - 10);
+                ctx.lineTo(x + 10 + i*10, y + 10);
+            }
+            ctx.lineTo(x + 50, y);
+            ctx.stroke();
+            ctx.fillText("R", x + 20, y - 20);
+        }
+        function drawResistorVertical(ctx, x, y) {
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            for(let i=0; i<4; i++) {
+                ctx.lineTo(x - 10, y + 5 + i*10);
+                ctx.lineTo(x + 10, y + 10 + i*10);
+            }
+            ctx.lineTo(x, y + 50);
+            ctx.stroke();
+            ctx.fillText("R", x + 15, y + 30);
+        }
+        function drawCoil(ctx, x, y) {
+            ctx.beginPath();
+            for(let i=0; i<4; i++) {
+                ctx.arc(x + 10 + i*10, y, 6, Math.PI, 0);
+            }
+            ctx.stroke();
+            ctx.fillText("L", x + 20, y - 20);
+        }
+        function drawCoilVertical(ctx, x, y) {
+            ctx.beginPath();
+            for(let i=0; i<4; i++) {
+                ctx.arc(x, y + 10 + i*10, 6, -Math.PI/2, Math.PI/2);
+            }
+            ctx.stroke();
+            ctx.fillText("L", x + 15, y + 30);
+        }
+        function drawCapacitor(ctx, x, y) {
+            ctx.beginPath();
+            ctx.moveTo(x, y); ctx.lineTo(x + 20, y);
+            ctx.moveTo(x + 20, y - 15); ctx.lineTo(x + 20, y + 15);
+            ctx.moveTo(x + 30, y - 15); ctx.lineTo(x + 30, y + 15);
+            ctx.moveTo(x + 30, y); ctx.lineTo(x + 50, y);
+            ctx.stroke();
+            ctx.fillText("C", x + 20, y - 20);
+        }
+        function drawCapacitorVertical(ctx, x, y) {
+            ctx.beginPath();
+            ctx.moveTo(x, y); ctx.lineTo(x, y + 20);
+            ctx.moveTo(x - 15, y + 20); ctx.lineTo(x + 15, y + 20);
+            ctx.moveTo(x - 15, y + 30); ctx.lineTo(x + 15, y + 30);
+            ctx.moveTo(x, y + 30); ctx.lineTo(x, y + 50);
+            ctx.stroke();
+            ctx.fillText("C", x + 20, y + 30);
+        }
+
+        // Desenare Diagrama Fazoriala
+        function drawArrow(ctx, fromX, fromY, toX, toY, color, text) {
+            const headlen = 10; 
+            const dx = toX - fromX;
+            const dy = toY - fromY;
+            const angle = Math.atan2(dy, dx);
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.lineTo(toX, toY);
+            ctx.fill();
+            if(text) {
+                ctx.font = "16px Arial bold";
+                ctx.fillText(text, toX + 5, toY - 5);
+            }
+        }
+
+        function drawPhasors(mode, U, I, R, XL, XC, phi) {
+            const canvas = document.getElementById('phasorCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const cx = canvas.width / 3; // mutam centrul mai la stanga
+            const cy = canvas.height / 2;
+
+            // Axe
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(cx - 100, cy); ctx.lineTo(cx + 400, cy);
+            ctx.moveTo(cx, cy - 150); ctx.lineTo(cx, cy + 150);
+            ctx.stroke();
+
+            const scale = 100; // factor scalare vizuala
+
+            if (mode === 'serie') {
+                // Curentul I pe orizontala
+                drawArrow(ctx, cx, cy, cx + 150, cy, '#94a3b8', 'I');
+                
+                // Tensiunile
+                const enR = document.getElementById('en-r').checked;
+                const enL = document.getElementById('en-l').checked;
+                const enC = document.getElementById('en-c').checked;
+
+                const maxV = Math.max(I*R, I*XL, I*XC, U);
+                const k = 120 / (maxV || 1); // factor scalare dinamica
+
+                const UR_len = enR ? I * R * k : 0;
+                const UL_len = enL ? I * XL * k : 0;
+                const UC_len = enC ? I * XC * k : 0;
+                const U_len = U * k;
+
+                if (enR) drawArrow(ctx, cx, cy, cx + UR_len, cy, '#ef4444', 'Ur');
+                if (enL) drawArrow(ctx, cx, cy, cx, cy - UL_len, '#3b82f6', 'Ul');
+                if (enC) drawArrow(ctx, cx, cy, cx, cy + UC_len, '#22c55e', 'Uc');
+
+                // Tensiunea rezultanta U
+                const ux = UR_len;
+                const uy = UC_len - UL_len;
+                drawArrow(ctx, cx, cy, cx + ux, cy + uy, '#eab308', 'U (Total)');
+                
+            } else {
+                // Tensiunea U pe orizontala
+                drawArrow(ctx, cx, cy, cx + 150, cy, '#94a3b8', 'U');
+
+                const enR = document.getElementById('en-r').checked;
+                const enL = document.getElementById('en-l').checked;
+                const enC = document.getElementById('en-c').checked;
+
+                const IR = enR ? U / R : 0;
+                const IL = enL ? U / XL : 0;
+                const IC = enC ? U / XC : 0;
+
+                const maxI = Math.max(IR, IL, IC, I);
+                const k = 120 / (maxI || 1);
+
+                if (enR) drawArrow(ctx, cx, cy, cx + IR*k, cy, '#ef4444', 'Ir');
+                if (enC) drawArrow(ctx, cx, cy, cx, cy - IC*k, '#22c55e', 'Ic'); // Ic in sus in paralel
+                if (enL) drawArrow(ctx, cx, cy, cx, cy + IL*k, '#3b82f6', 'Il'); // Il in jos in paralel
+
+                // Curentul rezultant I
+                const ix = IR * k;
+                const iy = (IL - IC) * k;
+                drawArrow(ctx, cx, cy, cx + ix, cy + iy, '#eab308', 'I (Total)');
+            }
+        }
+
+        // Initializeaza prima data
+        updateSim();
+    </script>
+</body>
+</html>
